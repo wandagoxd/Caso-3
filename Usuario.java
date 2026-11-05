@@ -1,66 +1,65 @@
-
 import java.util.Random;
-import java.util.random.*;
 
+// hilo del usuario que manda peticiones al sistema
 public class Usuario extends Thread {
 
-    // Necesitamos crear atributos para definir cada usuario. Luego, como es thread,
-    // crearemos el método run.;
+    private final int id;
+    private final int base;
+    private final BuzonEntrada buzon;
+    private final int totalCPUs;
+    private final int totalRAM;
+    private final int totalDisco;
 
-    private int id;
-    private int base;
-    private BuzonEntrada buzon;
-    private int totalCPUs;
-    private int totalRam;
-
-    public Usuario(int id_usuario, int base, BuzonEntrada buzon, int totalCPUs, int totalRam) {
-
-        this.buzon = buzon;
-        this.id = id_usuario;
+    public Usuario(int id, int base, BuzonEntrada buzon, int totalCPUs, int totalRAM, int totalDisco) {
+        this.id = id;
         this.base = base;
         this.buzon = buzon;
         this.totalCPUs = totalCPUs;
-        this.totalRam = totalRam;
-
+        this.totalRAM = totalRAM;
+        this.totalDisco = totalDisco;
     }
 
-    @Override 
+    @Override
     public void run() {
-
-        //Realizamos el cálculo de número de solicitudes.
-        int K = 5
-        int numSolicitudes = id * K
+        // cuantas solicitudes le tocan a este usuario en particular
+        int totalSolicitudes = id * base;
         Random rand = new Random();
-        
-        
-        for (int i = 0; i < numSolicitudes; i ++) {
-            //Randomizamos para los parámetros de solicitud
 
-            // Cálculo del total de solicitudes para este usuario
-            int numSolicitudes = id * base;
-        
-        
-            // A. Construir el ID único tipo "1_0", "1_1"...
+        for (int i = 0; i < totalSolicitudes; i++) {
+            // armamos el id unico tipo 1_0, 1_1 etc
             String idSolicitud = id + "_" + i;
 
-            // B. Generar recursos aleatorios respetando los máximos (75%)
-            int cpus = 1 + rand.nextInt((int) Math.round(totalCPUs * 0.75));
-            
-            int ramGen = 1 + rand.nextInt((int) Math.round(totalRam * 0.75));
-            int memoriaGiB = Integer.highestOneBit(ramGen); // Ajusta a potencia de 2
+            // calculamos cpus al azar respetando el 75%
+            int maxCPUs = Math.max(1, (int) Math.round(totalCPUs * 0.75));
+            int cpus = 1 + rand.nextInt(maxCPUs);
 
-            int discoGen = 1 + rand.nextInt((int) Math.round(totalDisco * 0.75));
-            int almacenamientoGiB = (discoGen / 2) * 2;   // Ajusta a múltiplo de 2
+            // ram al azar redondeada a potencia de dos
+            int maxRAM = Math.max(1, (int) Math.round(totalRAM * 0.75));
+            int ramGen = 1 + rand.nextInt(maxRAM);
+            int memoriaGiB = Integer.highestOneBit(ramGen);
+            if (memoriaGiB < 1) {
+                memoriaGiB = 1;
+            }
 
-            // C. Instanciar la Solicitud
+            // disco al azar redondeado a multiplo de 2
+            int maxDisco = Math.max(2, (int) Math.round(totalDisco * 0.75));
+            int discoGen = 1 + rand.nextInt(maxDisco);
+            int almacenamientoGiB = (discoGen / 2) * 2;
+            if (almacenamientoGiB < 2) {
+                almacenamientoGiB = 2; // pa que no quede en 0
+            }
+
             Solicitud solicitud = new Solicitud(idSolicitud, cpus, memoriaGiB, almacenamientoGiB);
-            
-            // D. Depositar en el buzón compartido (el buzón se encarga del wait si está lleno)
-            buzon.depositar(solicitud); 
-}
 
+            // metemos la solicitud al buzon compartido
+            try {
+                buzon.depositar(solicitud);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
-        buzon.reportarFinUsuario();
+        // le avisamos al buzon que este usuario ya acabo
+        buzon.reportarTerminacionUsuario();
     }
-
 }

@@ -1,18 +1,60 @@
+// sala donde se duermen las maquinas que no consiguieron todos sus recursos
 public class ZonaEspera {
-    public ZonaEspera(int umbral) { ... }
 
-    // Llamado por Gestor: Consulta si superó el umbral
-    public synchronized boolean superaUmbral() { ... }
+    private final int umbral;
+    private int mvsEnEspera;
+    private boolean bloqueadoPorUmbral;
 
-    // Llamado por Gestor: Espera pasiva hasta que las pendientes lleguen a 0
-    public synchronized void esperarVaciadoTotal() throws InterruptedException { ... }
+    public ZonaEspera(int umbral) {
+        this.umbral = umbral;
+        this.mvsEnEspera = 0;
+        this.bloqueadoPorUmbral = false;
+    }
 
-    // Llamado por MV: Suspende a la MV (espera pasiva) si falló en conseguir recursos
-    public synchronized void entrarEnEspera(MV mv) throws InterruptedException { ... }
+    // el gestor mira si se paso del umbral y si si se queda quieto hasta que se vacie del todo
+    public synchronized void verificarYEsperarUmbral() throws InterruptedException {
+        if (mvsEnEspera >= umbral) {
+            bloqueadoPorUmbral = true;
+        }
+        while (bloqueadoPorUmbral) {
+            wait(); // gestor esperando a que se desocupe la sala
+        }
+    }
 
-    // Llamado por MV al liberar recursos: Despierta a las MVs dormidas
-    public synchronized void notificarDisponibilidad() { ... }
+    // anotamos que entro una mv a esperar
+    public synchronized void registrarIngresoEspera() {
+        mvsEnEspera++;
+        if (mvsEnEspera >= umbral) {
+            bloqueadoPorUmbral = true;
+        }
+    }
 
-    // Llamado por el Main o validadores al final del programa
-    public synchronized boolean estaVacia() { ... }
+    // aca la mv se duerme de forma pasiva
+    public synchronized void dormirEnEspera() throws InterruptedException {
+        wait();
+    }
+
+    // cuando una mv que estaba aca por fin consigue todo, sale de la cuenta
+    public synchronized void salirDeEspera() {
+        mvsEnEspera--;
+        // si ya no queda nadie esperando y estabamos frenados, desbloqueamos a los gestores
+        if (mvsEnEspera == 0 && bloqueadoPorUmbral) {
+            bloqueadoPorUmbral = false;
+            notifyAll(); // se despiertan los gestores
+        }
+    }
+
+    // cuando alguna mv termina despierta a todas las que estan aca durmiendo
+    public synchronized void notificarDisponibilidad() {
+        notifyAll();
+    }
+
+    // pa chequear si la zona quedo limpia
+    public synchronized boolean estaVacia() {
+        return mvsEnEspera == 0;
+    }
+
+    public synchronized int getMvsEnEspera() {
+        return mvsEnEspera;
+    }
 }
